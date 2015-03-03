@@ -1,0 +1,335 @@
+//Perform a complete QR factorization on an mxn matrix A, returning the upper
+//triangular matrix R in the upper triangular part of the array A, and storing the
+//Householder vectors v_k in the strictly lower triangular part of the array A.
+//The first entry of each Householder vector is not stored since it is assumed
+//that v_k(1) = 1 for all of the Householder vectors v_k.
+
+#include <stdio.h>
+#include <stdlib.h>
+#include "cblas.h"
+#include "house.h"
+#include "applyH.h"
+#include <math.h>
+
+double *qrhouse(double *A, int m, int n)
+{
+	int i;
+	int row;
+	int col;
+	int inc = 1;
+	double alpha;
+	double beta;
+
+	//Create a m*n size matrix to store the original matrix A.
+	double *A_init = (double *) malloc(m*n*sizeof(double));
+	for(row=0;row<m;row++)
+	{
+		for(col=0;col<n;col++)
+		{
+			A_init[row*n+col] = A[row*n+col];
+		}
+	}
+	
+	//Create an m*m size matrix Q = H1*H2*H3..., where H = I - (2/(v'v))vv', initialize Q to an identity matrix.
+	//Multiply it with H in each loop, and finally test whether Q * R = original A.
+	double *Q = (double *) malloc(m*m*sizeof(double));
+	for(row=0;row<m;row++)
+	{
+		for(col=0;col<m;col++)
+		{
+			if(row==col)
+				Q[row*m+col] = 1;
+			else
+				Q[row*m+col] = 0;
+		}
+	}
+	/*
+	printf("Now Let's test the initialized Q.\n");
+	for(row=0;row<m;row++)
+	{
+		for(col=0;col<m;col++)
+		{
+			printf("Q[%d][%d] = %lf ", row, col, Q[row*m+col]);
+		}
+		printf("\n");
+	}
+	*/
+	
+	//Create an m size vector v and initialize it with all 0s.
+	double *v = (double *) malloc(m*1*sizeof(double));
+	for(i=0;i<m;i++)
+		v[i] = 0;
+	
+	int min;
+	if(m-1<n)
+		min = m-1;
+	else
+		min = n;
+	int k;
+	for(k=0;k<min;k++)
+	{
+		printf("\n******************************qrhouse Loop %d ******************************\n\n", k+1);
+	
+		//Get the first row of subset of A and print out.
+		double *sub_Av = (double *) malloc((m-k)*1*sizeof(double));
+		printf("Let's test sub_Av.\n");
+		for(i=0;i<m-k;i++)
+		{
+			sub_Av[i] = A[(i+k)*n+k];
+			printf("sub_Av[%d] = %lf ", i, sub_Av[i]);
+		}
+		printf("\n");
+		
+		
+		//If only the first element of this vector is not 0, the reflector will be all 0s and thus H will be I, in this case, HA will not update the matrix A, so we skip this loop. 
+		double norm_test = sqrt(cblas_ddot(m-k, sub_Av, 1, sub_Av, 1));
+		//printf("sub_Av[0] = %lf, norm_test = %lf\n", sub_Av[0], norm_test);
+		if(sub_Av[0] == norm_test)
+			continue;
+		
+		
+		//hA is the reflector vector got from house function.
+		double *hA = (double *) malloc((m-k)*sizeof(double));
+		hA = house(sub_Av, (m-k), 1);
+		
+		//Copy the data in hA to vector v and print out the reflector.
+		printf("Let's test hA.\n");
+		for(i=0;i<m-k;i++)
+		{
+			v[i+k] = hA[i];
+			printf("hA[%d] is %lf ", i, hA[i]);
+		}
+		printf("\n");
+		
+		
+		//Compute H, although in smart way we don't need to get H, but here we calculate H to verify whether Q*R = original A.
+		alpha = -2/(cblas_ddot((m-k), hA, inc, hA, inc));	// -gamma
+		printf("alpha = %lf\n", alpha);
+		
+		double *H_temp = (double *) malloc((m-k)*(m-k)*sizeof(double));
+		for(row=0;row<m-k;row++)
+		{
+			for(col=0;col<m-k;col++)
+			{
+				if(row==col)
+					H_temp[row*(m-k)+col] = 1;
+				else
+					H_temp[row*(m-k)+col] = 0;
+			}
+		}
+		
+		//Use cblas_dger to compute H_temp = alpha*hA*hA'+H_temp, i.e., H_temp = I - (2/(hA'*hA))*hA*hA'.
+		cblas_dger(CblasRowMajor, (m-k), (m-k), alpha, hA, inc, hA, inc, H_temp, (m-k));
+		
+		/*
+		printf("Let's test the temporary H%d.\n", k+1);
+		for(row=0;row<m-k;row++)
+		{
+			for(col=0;col<m-k;col++)
+			{
+				printf("H[%d][%d] = %lf ", row, col, H_temp[row*(m-k)+col]);
+			}
+			printf("\n");
+		}
+		*/
+		
+		double *H_full = (double *) malloc(m*m*sizeof(double));
+		for(row=0;row<m;row++)
+		{
+			for(col=0;col<m;col++)
+			{
+				if(row<k || col<k)
+				{
+					if(row==col)
+						H_full[row*m+col] = 1;
+					else
+						H_full[row*m+col] = 0;
+				}
+				else
+				{
+					H_full[row*m+col] = H_temp[(row-k)*(m-k)+(col-k)];
+				}
+			}
+		}
+		printf("Let's test the full H%d.\n", k+1);
+		for(row=0;row<m;row++)
+		{
+			for(col=0;col<m;col++)
+			{
+				printf("H[%d][%d] = %lf ", row, col, H_full[row*m+col]);
+			}
+			printf("\n");
+		}
+		
+		//Update Q with H.
+		alpha = 1.0;
+		beta = 0.0;
+		
+		double *Q_temp = (double *) malloc(m*m*sizeof(double));	//a copy of Q;
+		for(row=0;row<m;row++)
+		{
+			for(col=0;col<m;col++)
+			{
+				Q_temp[row*m+col] = Q[row*m+col];
+			}
+		}
+		
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, m, m, alpha, Q_temp, m, H_full, m, beta, Q, m);
+		
+		printf("Now Let's test Q in this loop.\n");
+		for(row=0;row<m;row++)
+		{
+			for(col=0;col<m;col++)
+			{
+				printf("Q[%d][%d] = %lf ", row, col, Q[row*m+col]);
+			}
+			printf("\n");
+		}
+		
+		/*
+		//Print out the vector v.
+		printf("Let's test vector v.\n");
+		for(i=0;i<m;i++)
+		{
+			printf("v[%d] = %lf ", i, v[i]);
+		}
+		printf("\n");
+		*/
+		
+
+		//Get the subset of A and print out.
+		double *sub_AM = (double *) malloc((m-k)*(n-k)*sizeof(double));
+
+		printf("Let's test sub_AM.\n");
+		for(row=0;row<m-k;row++)
+		{
+			for(col=0;col<n-k;col++)
+			{
+				sub_AM[row*(n-k)+col] = A[(row+k)*n+(col+k)];
+				printf("sub_AM[%d][%d] = %lf ", row, col, sub_AM[row*(n-k)+col]);
+			}
+			printf("\n");
+		}
+		printf("m = %d, n = %d.\n", m-k, n-k);
+		
+
+		//Use subset of A and current reflector hA in applyH function to get the updated subset of A and print it out.
+		double *aHAv = (double *) malloc((m-k)*(n-k)*sizeof(double));
+		aHAv = applyH(sub_AM, m-k, n-k, hA, m-k, 1);
+
+		printf("Let's test HA (the updated subset of A).\n");
+		for(row=0;row<m-k;row++)
+		{
+			for(col=0;col<n-k;col++)
+			{
+				printf("HA[%d][%d] = %lf ", row, col, aHAv[row*(n-k)+col]);
+			}
+			printf("\n");
+		}
+
+		
+		//Copy the updated subset of A to A to update A.
+		for(row=0;row<m-k;row++)
+		{
+			for(col=0;col<n-k;col++)
+			{
+				A[(row+k)*n+(col+k)] = aHAv[row*(n-k)+col];
+			}
+		}
+		
+		//Print the whole updated A.
+		printf("Let's test the whole updated A.\n");
+		for(row=0;row<m;row++)
+		{
+			for(col=0;col<n;col++)
+			{
+				printf("A[%d][%d] = %lf ", row, col, A[row*n+col]);
+			}
+			printf("\n");
+		}
+		
+		
+		//Store the Householder vector in the strictly lower triangular part of A and test the final A in current loop.
+		for(i=k;i<m-1;i++)
+			A[(i+1)*n+k] = v[i+1];
+			
+		printf("Print the final A result.\n");
+		for(row=0;row<m;row++)
+		{
+			for(col=0;col<n;col++)
+			{
+				printf("A[%d][%d] = %lf ", row, col, A[row*n+col]);
+			}
+			printf("\n");
+		}
+		
+	}
+	
+	double *R = (double *) malloc(m*n*sizeof(double));
+	for(row=0;row<m;row++)
+	{
+		for(col=0;col<n;col++)
+		{
+			if(row<=col)
+				R[row*n+col] = A[row*n+col];
+			else
+				R[row*n+col] = 0;
+		}
+	}
+	printf("Let's test R.\n");
+	for(row=0;row<m;row++)
+	{
+		for(col=0;col<n;col++)
+		{
+			printf("R[%d][%d] = %lf ", row, col, R[row*n+col]);
+		}
+		printf("\n");
+	}
+	
+	/*
+	//Test the cblas_dgemm function alone.
+	double AX[6] = {2.0, 3.0, 0.0, 4.0, 1.0, 2.0};
+	double BX[2] = {2.0, 1.0};
+	double CX[3] = {0.0, 0.0, 0.0};
+	alpha = 1.0;
+	beta = 0.0;
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 3, 1, 2, alpha, AX, 2, BX, 1, beta, CX, 1);
+	for(i=0;i<3;i++)
+		printf("CX[%d] = %lf\t", i, CX[i]);
+	printf("\n");
+	*/
+	
+	printf("Now, let's test whether Q * R = original A.\n");
+	double *QR = (double *) malloc(m*n*sizeof(double));
+	for(i=0;i<m*n;i++)
+		QR[i] = 0;
+	
+	alpha = 1.0;
+	beta = 0.0;
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, n, m, alpha, Q, m, R, n, beta, QR, n);
+	for(row=0;row<m;row++)
+	{
+		for(col=0;col<n;col++)
+		{
+			printf("QR[%d][%d] = %lf ", row, col, QR[row*n+col]);
+		}
+		printf("\n");
+	}
+	
+	double tag = 0;
+	for(row=0;row<m;row++)
+	{
+		for(col=0;col<n;col++)
+		{
+			if(abs(QR[row*n+col] - A_init[row*n+col]) > 1E-4)
+				tag = 1;
+		}
+	}
+	if(tag==0)
+		printf("\nYour QR factorization is correct. Congratulations!\n\n");
+	else
+		printf("\nYour QR factorization is wrong. :-(\n\n");
+	
+	return A;
+	
+}

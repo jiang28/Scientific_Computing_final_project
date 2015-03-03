@@ -1,0 +1,87 @@
+
+%-------------------------------------------------------------------------------
+%
+% This script will create a (random) coefficient matrix A and write it to
+% a file in standard coordinate format. The first line of the file will have
+% three integers:
+%
+%   number_of_rows   number_of_columns   number_of_nonzeros
+%
+% For a dense m x n matrix, that line will have
+%
+%         m                  n               m*n
+%
+% Each of the m*n lines following the first one will have two integers and 
+% a single double precision number:
+%
+%         i                  j               val
+%
+% where i is the row number, j is the column number, and val is the (i,j)-th
+% entry in a matrix A. Viz., A(i,j) = val. A code can then read in the matrix
+% easily, reading the first line for sizes, allocating storage for the array,
+% and then reading the rest of the file to fill it in.
+%
+% The file name is the concatenation of A, m, and n. E.g., for m = 17 and
+% n = 4, the filename is A_17_4
+%
+% Sample output for m = 7 and n = 4 is
+%
+%      7   4   28
+%      1   1       5.37667139546100015e-01 
+%      2   1       1.83388501459508646e+00 
+%      3   1      -2.25884686100364807e+00 
+%      4   1       8.62173320368120555e-01 
+%      5   1       3.18765239858980809e-01 
+%      6   1      -1.30768829630527339e+00 
+%      7   1      -4.33592022305683555e-01 
+%      1   2       3.42624466538649919e-01 
+%      2   2       3.57839693972576045e+00 
+%      3   2       2.76943702988487717e+00 
+%      4   2      -1.34988694015652122e+00 
+%      5   2       3.03492346633185450e+00 
+%      6   2       7.25404224946105569e-01 
+%      7   2      -6.30548731896561909e-02 
+%      1   3       7.14742903826095843e-01 
+%      2   3      -2.04966058299774628e-01 
+%      3   3      -1.24144348216311914e-01 
+%      4   3       1.48969760778546489e+00 
+%      5   3       1.40903448980047918e+00 
+%      6   3       1.41719241342961388e+00 
+%      7   3       6.71497133608080499e-01 
+%      1   4      -1.20748692268503777e+00 
+%      2   4       7.17238651328838461e-01 
+%      3   4       1.63023528916472915e+00 
+%      4   4       4.88893770311789377e-01 
+%      5   4       1.03469300991786017e+00 
+%      6   4       7.26885133383237902e-01 
+%      7   4      -3.03440924786015920e-01 
+%
+% and is written to a file named "A_7_4".  Beware: this calls Matlab's random
+% number generator, which means you will get the same results for a given
+% m and n if you exit and restart Matlab before the call to randn() below.
+% For each different sized system you generate, do that (exit and then restart
+% Matlab) so we all will get the same numbers ...
+%
+% Usage: 1. Edit this file to set m and n
+%        2. start Matlab
+%        3. type the command 
+%               >> createsystem
+%        4. exit Matlab
+%        5. read in the matrix into your C/C++/Fortran code.
+%
+% For different matrices, change m and n as needed.
+%
+%----------------------------------------------------------------------------
+
+m = 100;
+n = 100;
+A = randn(m, n);
+
+filename = sprintf('A_%d_%d', m, n);
+errorflag = writematrix(sparse(A), filename);
+
+if (errorflag)
+    disp(sprintf('Something wrong in writing the file %s; error flag = ', ...
+           filename, errorflag))
+end
+

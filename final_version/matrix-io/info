@@ -1,0 +1,45 @@
+
+Matlab files to create, read, and write rectangular m x n matrices A for 
+least squares problems
+
+    min_x ||Ax-b||
+
+These only set up the matrix A; for the right-hand side vector initialize
+it in your own code to have
+
+    b(i) = 1/i, for i = 1:m
+
+Using 1/i is intended to make clear that the indexing shown is 1-based; the
+formula needs to be shifted if you use C++ or Fortran 0-based indexing.
+Be sure to read and understand the comments in createsystem.m; the other
+files should work without problem, and the only one you need edit is
+createsystem.m, to change the sizes m and n. The files readmatrix.m and
+testreadwrite.m are not needed for P573. The files here include: 
+
+----------------
+createsystem.m
+----------------
+This will set up a file with the coefficient matrix A. Read the info in it.
+
+--------------
+readmatrix.m
+writematrix.m 
+--------------
+Short functions to read/write an array from/to an ASCII file to full
+17-digit precision, allowing I/O to and from C++/Fortran with complete
+reproducibility. For p573, you only need to write the linear system from
+Matlab, then read it into your own code. The Matlab reader is just there
+for completeness.
+
+The I/O functions can treat the array as sparse but are set up to read and
+write dense matrices. Change returnsparse in readmatrix.m and writesparse
+in writematrix if you want sparsity to be exploited. In that case, initialize
+your array to all zeros, then only assign values to the entries that are
+specified in the input file. For P573, just use dense matrices.
+
+
+----------------
+testreadwrite.m
+----------------
+A script for testing both read and write functions. You don't need this
+one for the assignment.
